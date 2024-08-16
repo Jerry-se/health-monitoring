@@ -2,13 +2,15 @@ package ws
 
 import (
 	"encoding/json"
-	"health-monitoring/types"
 	"testing"
 	"time"
+
+	"health-monitoring/types"
 
 	"github.com/gorilla/websocket"
 )
 
+// go test -v -timeout 30s -count=1 -run TestWsMachine health-monitoring/ws
 func TestWsMachine(t *testing.T) {
 	url := "ws://localhost:9521/websocket"
 	c, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -22,6 +24,7 @@ func TestWsMachine(t *testing.T) {
 	}
 
 	done := make(chan struct{})
+	resChan := make(chan types.WsResponse)
 	go func() {
 		defer close(done)
 		for {
@@ -32,15 +35,12 @@ func TestWsMachine(t *testing.T) {
 			}
 			t.Logf("recv: %s", message)
 
-			response := &types.WsResponse{}
-			if err := json.Unmarshal(message, response); err != nil {
+			response := types.WsResponse{}
+			if err := json.Unmarshal(message, &response); err != nil {
 				println("parse websocket response failed:", err)
 				break
 			}
-			if response.Type == uint32(types.WsMtMachineInfo) && response.Code == 0 {
-				println("received machine info success")
-				break
-			}
+			resChan <- response
 		}
 	}()
 
@@ -70,6 +70,11 @@ func TestWsMachine(t *testing.T) {
 	}
 	if err := c.WriteMessage(websocket.TextMessage, reqBytes); err != nil {
 		t.Fatalf("send websocket message failed: %v", err)
+	}
+
+	onlineRes := <-resChan
+	if onlineRes.Type != uint32(types.WsMtOnline) || onlineRes.Code != 0 {
+		t.Fatal("received online request", onlineRes.Message)
 	}
 
 	reqId++
@@ -108,12 +113,18 @@ func TestWsMachine(t *testing.T) {
 		t.Fatalf("send websocket message failed: %v", err)
 	}
 
-	<-done
+	miRes := <-resChan
+	if miRes.Type == uint32(types.WsMtMachineInfo) {
+		t.Log("received machine info response", miRes.Code, miRes.Message)
+	}
 
 	err = c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	if err != nil {
 		t.Log("write close:", err)
 		return
 	}
-	<-time.After(time.Second)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+	}
 }

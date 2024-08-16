@@ -65,7 +65,7 @@ func handleWsOnlineRequest(ctx context.Context, c *websocket.Conn, nodeId *strin
 	if err := json.Unmarshal(req.Body, onlineReq); err != nil {
 		log.Log.WithFields(logrus.Fields{
 			"node_id": *nodeId,
-		}).Error("parse online request failed", err)
+		}).Error("parse online request failed: ", err)
 		writeWsResponse(c, *nodeId, &types.WsResponse{
 			WsHeader: types.WsHeader{
 				Version:   0,
@@ -165,7 +165,7 @@ func handleWsMachineInfoRequest(ctx context.Context, c *websocket.Conn, nodeId s
 	if err := json.Unmarshal(req.Body, &miReq); err != nil {
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
-		}).Error("parse machine info request failed", err)
+		}).Error("parse machine info request failed: ", err)
 		writeWsResponse(c, nodeId, &types.WsResponse{
 			WsHeader: types.WsHeader{
 				Version:   0,
