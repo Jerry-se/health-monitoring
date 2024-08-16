@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 
+	"health-monitoring/db"
 	"health-monitoring/log"
 	"health-monitoring/types"
 	"health-monitoring/ws"
@@ -34,6 +36,13 @@ func main() {
 	}
 	if err := log.InitLogrus(cfg.LogLevel, cfg.LogFile); err != nil {
 		fmt.Println("Initialize the log failed:", err)
+		os.Exit(1)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := db.InitMongo(ctx, cfg.MongoURI, cfg.MongoDB); err != nil {
 		os.Exit(1)
 	}
 

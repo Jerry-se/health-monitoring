@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"health-monitoring/db"
 	"health-monitoring/log"
 	"health-monitoring/types"
 
@@ -48,6 +49,9 @@ func Ws(ctx *gin.Context) {
 		return
 	}
 	defer func() {
+		if nodeId != "" {
+			db.MDB.NodeOffline(r.Context(), nodeId)
+		}
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
 		}).Info("connection stopped")
@@ -96,51 +100,7 @@ func Ws(ctx *gin.Context) {
 			continue
 		}
 
-		switch req.Type {
-		case uint32(types.WsMtOnline):
-			onlineReq := &types.WsOnlineRequest{}
-			if err := json.Unmarshal(req.Body, onlineReq); err != nil {
-				log.Log.WithFields(logrus.Fields{
-					"node_id": nodeId,
-				}).Error("parse online request failed", err)
-				writeWsResponse(c, nodeId, &types.WsResponse{
-					WsHeader: types.WsHeader{
-						Version:   0,
-						Timestamp: time.Now().Unix(),
-						Id:        req.Id,
-						Type:      req.Type,
-						PubKey:    []byte(""),
-						Sign:      []byte(""),
-					},
-					Code:    uint32(types.ErrCodeParam),
-					Message: "parse online request failed",
-					Body:    []byte(""),
-				})
-				continue
-			}
-			nodeId = onlineReq.NodeId
-			handleWsOnlineRequest(c, nodeId, req, onlineReq)
-		case uint32(types.WsMtMachineInfo):
-			handleWsMachineInfoRequest(c, nodeId, req)
-		default:
-			log.Log.WithFields(logrus.Fields{
-				"node_id": nodeId,
-			}).Error("unknowned request message type")
-			writeWsResponse(c, nodeId, &types.WsResponse{
-				WsHeader: types.WsHeader{
-					Version:   0,
-					Timestamp: time.Now().Unix(),
-					Id:        req.Id,
-					Type:      req.Type,
-					PubKey:    []byte(""),
-					Sign:      []byte(""),
-				},
-				Code:    uint32(types.ErrCodeParam),
-				Message: "unknowned request message type",
-				Body:    []byte(""),
-			})
-		}
-
+		handleWsRequest(r.Context(), c, &nodeId, req)
 	}
 }
 
@@ -159,62 +119,5 @@ func writeWsResponse(c *websocket.Conn, nodeId string, res *types.WsResponse) er
 		}).Error("write response message failed", err)
 		return err
 	}
-	return nil
-}
-
-func handleWsOnlineRequest(c *websocket.Conn, nodeId string, req *types.WsRequest, online *types.WsOnlineRequest) error {
-	writeWsResponse(c, nodeId, &types.WsResponse{
-		WsHeader: types.WsHeader{
-			Version:   0,
-			Timestamp: time.Now().Unix(),
-			Id:        req.Id,
-			Type:      req.Type,
-			PubKey:    []byte(""),
-			Sign:      []byte(""),
-		},
-		Code:    0,
-		Message: "ok",
-		Body:    []byte(""),
-	})
-	return nil
-}
-
-func handleWsMachineInfoRequest(c *websocket.Conn, nodeId string, req *types.WsRequest) error {
-	miReq := &types.WsMachineInfoRequest{}
-	if err := json.Unmarshal(req.Body, miReq); err != nil {
-		log.Log.WithFields(logrus.Fields{
-			"node_id": nodeId,
-		}).Error("parse machine info request failed", err)
-		writeWsResponse(c, nodeId, &types.WsResponse{
-			WsHeader: types.WsHeader{
-				Version:   0,
-				Timestamp: time.Now().Unix(),
-				Id:        req.Id,
-				Type:      req.Type,
-				PubKey:    []byte(""),
-				Sign:      []byte(""),
-			},
-			Code:    uint32(types.ErrCodeParam),
-			Message: "parse machine info request failed",
-			Body:    []byte(""),
-		})
-		return err
-	}
-	log.Log.WithFields(logrus.Fields{
-		"node_id": nodeId,
-	}).WithField("machine info", miReq).Info("update machine info")
-	writeWsResponse(c, nodeId, &types.WsResponse{
-		WsHeader: types.WsHeader{
-			Version:   0,
-			Timestamp: time.Now().Unix(),
-			Id:        req.Id,
-			Type:      req.Type,
-			PubKey:    []byte(""),
-			Sign:      []byte(""),
-		},
-		Code:    0,
-		Message: "ok",
-		Body:    []byte(""),
-	})
 	return nil
 }
