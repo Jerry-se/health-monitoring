@@ -56,7 +56,7 @@ func TestWsMachine(t *testing.T) {
 	req := &types.WsRequest{
 		WsHeader: types.WsHeader{
 			Version:   0,
-			Timestamp: time.Now().Unix(),
+			Timestamp: time.Now().UnixMilli(),
 			Id:        reqId,
 			Type:      uint32(types.WsMtOnline),
 			PubKey:    []byte(""),
@@ -77,6 +77,7 @@ func TestWsMachine(t *testing.T) {
 		t.Fatal("received online request", onlineRes.Message)
 	}
 
+	time.Sleep(2 * time.Second)
 	reqId++
 
 	machineInfo := &types.WsMachineInfoRequest{
@@ -97,7 +98,7 @@ func TestWsMachine(t *testing.T) {
 	req2 := &types.WsRequest{
 		WsHeader: types.WsHeader{
 			Version:   0,
-			Timestamp: time.Now().Unix(),
+			Timestamp: time.Now().UnixMilli(),
 			Id:        reqId,
 			Type:      uint32(types.WsMtMachineInfo),
 			PubKey:    []byte(""),
@@ -117,6 +118,8 @@ func TestWsMachine(t *testing.T) {
 	if miRes.Type == uint32(types.WsMtMachineInfo) {
 		t.Log("received machine info response", miRes.Code, miRes.Message)
 	}
+
+	time.Sleep(2 * time.Second)
 
 	err = c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	if err != nil {

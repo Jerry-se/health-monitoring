@@ -182,20 +182,9 @@ func handleWsMachineInfoRequest(ctx context.Context, c *websocket.Conn, nodeId s
 		return nil
 	}
 
-	ctx1, cancel1 := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel1()
-	var err error
-	_, err = db.MDB.GetDeviceInfo(ctx1, nodeId)
-	if err != nil {
-		ctx2, cancel2 := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel2()
-		err = db.MDB.AddDeviceInfo(ctx2, nodeId, miReq)
-	} else {
-		ctx2, cancel2 := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel2()
-		err = db.MDB.UpdateDeviceInfo(ctx2, nodeId, miReq)
-	}
-	if err != nil {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := db.MDB.AddDeviceInfo(ctx, nodeId, time.UnixMilli(req.Timestamp), miReq); err != nil {
 		writeWsResponse(c, nodeId, &types.WsResponse{
 			WsHeader: types.WsHeader{
 				Version:   0,

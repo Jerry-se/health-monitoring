@@ -1,13 +1,23 @@
 package types
 
+import "time"
+
 type MDBDeviceOnline struct {
-	DeviceId string `json:"device_id" bson:"device_id"`
-	AddTime  int64  `json:"add_time" bson:"add_time"`
+	DeviceId string    `json:"device_id" bson:"device_id"`
+	AddTime  time.Time `json:"add_time" bson:"add_time"`
+}
+
+type MDBMetaField struct {
+	DeviceId string      `json:"device_id" bson:"device_id"`
+	Project  string      `json:"project" bson:"project"`
+	Models   []ModelInfo `json:"models" bson:"models"`
+	GPUName  string      `json:"gpu_name" bson:"gpu_name"`
 }
 
 type MDBDeviceInfo struct {
-	DeviceId string `json:"device_id" bson:"device_id,omitempty"`
-	WsMachineInfoRequest
-	AddTime    int64 `json:"add_time" bson:"add_time,omitempty"`
-	UpdateTime int64 `json:"update_time" bson:"update_time,omitempty"`
+	Timestamp      time.Time    `json:"timestamp" bson:"timestamp"`
+	Device         MDBMetaField `json:"device" bson:"device"`
+	UtilizationGPU int          `json:"utilization_gpu" bson:"utilization_gpu"`
+	MemoryTotal    int64        `json:"memory_total" bson:"memory_total"`
+	MemoryUsed     int64        `json:"memory_used" bson:"memory_used"`
 }
