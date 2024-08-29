@@ -5,8 +5,9 @@
 ## 设计方案
 
 1. 提供 HTTP/Websocket 服务，可以用 Websocket 是否连接作为是否在线的判断依据。
-2. 使用 MongoDB 数据库存储，支持水平扩展的集群服务。
+2. 使用 MongoDB 数据库存储客户端推送的指标数据，支持水平扩展的集群服务。
 3. 提供一些接口可以为 Prometheus 提供数据。
+4. 提供一些管理接口或功能，如数据清理、持久化等。
 
 - [MongoDB 时间序列](https://www.mongodb.com/zh-cn/products/capabilities/time-series)
 - [MongoDB 时间序列用户文档](https://www.mongodb.com/zh-cn/docs/manual/core/timeseries-collections/)
@@ -206,3 +207,20 @@ server 向 client 返回的应答消息体格式结构相似，只比请求多�
   </tr>
 </table>
 
+## Prometheus
+
+假设本服务的 HTTP 地址设置为 `192.168.1.159:9527`，当需要为 Prometheus 提供监控数据时，只需要在 Prometheus 的配置中增加如下的 `scrape_config`:
+
+```yaml
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    metrics_path: "/metrics/prometheus"
+    static_configs:
+      - targets: ["192.168.1.159:9527"]
+```
