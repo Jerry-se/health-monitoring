@@ -47,7 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pm := http.NewPrometheusMetrics()
+	pm := http.NewPrometheusMetrics(cfg.Prometheus.JobName)
 
 	router := gin.Default()
 	router.GET("/metrics/prometheus", pm.Metrics)

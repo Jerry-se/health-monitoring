@@ -23,7 +23,8 @@ type mongoDB struct {
 }
 
 func InitMongo(ctx context.Context, uri, db string, eas int64) error {
-	opts := options.Client().ApplyURI(uri)
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		log.Log.Fatalf("Connect mongodb failed: %v", err)
@@ -37,7 +38,7 @@ func InitMongo(ctx context.Context, uri, db string, eas int64) error {
 		Mongo: client,
 	}
 
-	cl, err := client.Database(db).ListCollectionNames(ctx, bson.M{"name": "device_info", "type": "collection"})
+	cl, err := client.Database(db).ListCollectionNames(ctx, bson.M{"name": "device_info"})
 	if err != nil {
 		log.Log.Fatalf("List mongodb collection names failed: %v", err)
 		return err
@@ -150,4 +151,35 @@ func (db *mongoDB) DeleteExpiredDeviceInfo(ctx context.Context, tm time.Time) er
 	}
 	log.Log.Infof("Delete expired documents before %v manully DeletedCount %v", tm, result.DeletedCount)
 	return nil
+}
+
+func (db *mongoDB) GetAllLatestDeviceInfo(ctx context.Context) []types.MDBDeviceInfo {
+	di := make([]types.MDBDeviceInfo, 0)
+	pipeline := mongo.Pipeline{
+		// {{"$match", bson.D{{"timestamp", bson.D{{"$gt", specificTimestamp}}}}}},
+		{{"$sort", bson.D{{"device.device_id", 1}, {"timestamp", -1}}}},
+		{{"$group", bson.D{
+			{"_id", "$device.device_id"},
+			{"latestRecord", bson.D{{"$first", "$$ROOT"}}},
+		}}},
+		{{"$replaceRoot", bson.D{{"newRoot", "$latestRecord"}}}},
+	}
+	cursor, err := db.deviceInfoCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Log.Errorf("Aggregate documents of all latest device info failed: %v", err)
+		return di
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		result := types.MDBDeviceInfo{}
+		if err := cursor.Decode(&result); err != nil {
+			log.Log.Errorf("Decode aggregate cursor into struct failed: %v", err)
+		} else {
+			di = append(di, result)
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Log.Errorf("Traversal aggregate cursor failed: %v", err)
+	}
+	return di
 }
