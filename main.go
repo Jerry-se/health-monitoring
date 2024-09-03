@@ -52,6 +52,8 @@ func main() {
 	router := gin.Default()
 	router.GET("/metrics/prometheus", pm.Metrics)
 	router.GET("/echo", ws.Echo)
-	router.GET("/websocket", ws.Ws)
+	router.GET("/websocket", func(c *gin.Context) {
+		ws.Ws(c, pm)
+	})
 	log.Log.Fatal(router.Run(cfg.Addr))
 }

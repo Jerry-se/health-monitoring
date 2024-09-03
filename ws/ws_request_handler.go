@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"health-monitoring/db"
+	hmp "health-monitoring/http"
 	"health-monitoring/log"
 	"health-monitoring/types"
 
@@ -13,12 +14,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func handleWsRequest(ctx context.Context, c *websocket.Conn, nodeId *string, req *types.WsRequest) error {
+func handleWsRequest(ctx context.Context, c *websocket.Conn, nodeId *string, req *types.WsRequest, pm *hmp.PrometheusMetrics) error {
 	switch req.Type {
 	case uint32(types.WsMtOnline):
-		handleWsOnlineRequest(ctx, c, nodeId, req)
+		handleWsOnlineRequest(ctx, c, nodeId, req, pm)
 	case uint32(types.WsMtMachineInfo):
-		handleWsMachineInfoRequest(ctx, c, *nodeId, req)
+		handleWsMachineInfoRequest(ctx, c, *nodeId, req, pm)
 	default:
 		log.Log.WithFields(logrus.Fields{
 			"node_id": *nodeId,
@@ -40,7 +41,7 @@ func handleWsRequest(ctx context.Context, c *websocket.Conn, nodeId *string, req
 	return nil
 }
 
-func handleWsOnlineRequest(ctx context.Context, c *websocket.Conn, nodeId *string, req *types.WsRequest) error {
+func handleWsOnlineRequest(ctx context.Context, c *websocket.Conn, nodeId *string, req *types.WsRequest, pm *hmp.PrometheusMetrics) error {
 	if *nodeId != "" {
 		writeWsResponse(c, *nodeId, &types.WsResponse{
 			WsHeader: types.WsHeader{
@@ -140,7 +141,7 @@ func handleWsOnlineRequest(ctx context.Context, c *websocket.Conn, nodeId *strin
 	return nil
 }
 
-func handleWsMachineInfoRequest(ctx context.Context, c *websocket.Conn, nodeId string, req *types.WsRequest) error {
+func handleWsMachineInfoRequest(ctx context.Context, c *websocket.Conn, nodeId string, req *types.WsRequest, pm *hmp.PrometheusMetrics) error {
 	if nodeId == "" {
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
@@ -201,6 +202,7 @@ func handleWsMachineInfoRequest(ctx context.Context, c *websocket.Conn, nodeId s
 		return nil
 	}
 
+	pm.SetMetrics(nodeId, miReq)
 	log.Log.WithFields(logrus.Fields{
 		"node_id": nodeId,
 	}).WithField("machine info", miReq).Info("update machine info")
