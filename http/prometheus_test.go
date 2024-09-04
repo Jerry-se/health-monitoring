@@ -109,6 +109,8 @@ func TestPrometheusTimestamp(t *testing.T) {
 		),
 	)
 
+	_ = s
+
 	// reg := prometheus.NewRegistry()
 	// reg.MustRegister(s)
 

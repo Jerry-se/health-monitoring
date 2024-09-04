@@ -4,10 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"health-monitoring/db"
-	"health-monitoring/http"
+	hmp "health-monitoring/http"
 	"health-monitoring/log"
 	"health-monitoring/types"
 	"health-monitoring/ws"
@@ -40,20 +44,52 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Create context that listens for the interrupt signal from the OS.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	if err := db.InitMongo(ctx, cfg.MongoDB.URI, cfg.MongoDB.Database, cfg.MongoDB.ExpireTime); err != nil {
 		os.Exit(1)
 	}
 
-	pm := http.NewPrometheusMetrics(cfg.Prometheus.JobName)
+	pm := hmp.NewPrometheusMetrics(cfg.Prometheus.JobName)
 
 	router := gin.Default()
 	router.GET("/metrics/prometheus", pm.Metrics)
-	router.GET("/echo", ws.Echo)
+	// router.GET("/echo", ws.Echo)
 	router.GET("/websocket", func(c *gin.Context) {
 		ws.Ws(c, pm)
 	})
-	log.Log.Fatal(router.Run(cfg.Addr))
+
+	// log.Log.Fatal(router.Run(cfg.Addr))
+
+	srv := &http.Server{
+		Addr:    cfg.Addr,
+		Handler: router,
+	}
+
+	// Initializing the server in a goroutine so that
+	// it won't block the graceful shutdown handling below
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Log.Fatalf("Start server: %v", err)
+		}
+	}()
+
+	// Listen for the interrupt signal.
+	<-ctx.Done()
+
+	// Restore default behavior on the interrupt signal and notify user of shutdown.
+	stop()
+	log.Log.Println("shutting down gracefully, press Ctrl+C again to force")
+
+	// The context is used to inform the server it has 5 seconds to finish
+	// the request it is currently handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Log.Fatal("Server forced to shutdown: ", err)
+	}
+
+	log.Log.Println("Server exiting")
 }
