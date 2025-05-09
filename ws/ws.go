@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"health-monitoring/db"
+	hmp "health-monitoring/http"
 	"health-monitoring/log"
 	"health-monitoring/types"
 
@@ -39,7 +40,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 )
 
-func Ws(ctx *gin.Context) {
+func Ws(ctx *gin.Context, pm *hmp.PrometheusMetrics) {
 	w, r := ctx.Writer, ctx.Request
 	var nodeId string
 	c, err := upgrader.Upgrade(w, r, nil)
@@ -51,6 +52,7 @@ func Ws(ctx *gin.Context) {
 	defer func() {
 		if nodeId != "" {
 			db.MDB.NodeOffline(r.Context(), nodeId)
+			pm.DeleteMetrics(nodeId)
 		}
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
@@ -100,7 +102,7 @@ func Ws(ctx *gin.Context) {
 			continue
 		}
 
-		handleWsRequest(r.Context(), c, &nodeId, req)
+		handleWsRequest(r.Context(), c, &nodeId, req, pm)
 	}
 }
 

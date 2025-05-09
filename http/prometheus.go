@@ -1,11 +1,9 @@
 package http
 
 import (
-	"context"
 	"net/http"
-	"time"
 
-	"health-monitoring/db"
+	"health-monitoring/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,6 +52,24 @@ func NewPrometheusMetrics(jobName string) *PrometheusMetrics {
 	return pm
 }
 
+func (pm PrometheusMetrics) SetMetrics(id string, info types.WsMachineInfoRequest) {
+	if pm.jobName == "" {
+		return
+	}
+	pm.utilizationGPUGauge.WithLabelValues(pm.jobName, id).Set(float64(info.UtilizationGPU))
+	pm.memoryTotalGauge.WithLabelValues(pm.jobName, id).Set(float64(info.MemoryTotal))
+	pm.memoryUsedGauge.WithLabelValues(pm.jobName, id).Set(float64(info.MemoryUsed))
+}
+
+func (pm PrometheusMetrics) DeleteMetrics(id string) {
+	if pm.jobName == "" {
+		return
+	}
+	pm.utilizationGPUGauge.DeleteLabelValues(pm.jobName, id)
+	pm.memoryTotalGauge.DeleteLabelValues(pm.jobName, id)
+	pm.memoryUsedGauge.DeleteLabelValues(pm.jobName, id)
+}
+
 func (pm PrometheusMetrics) Metrics(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
 	if pm.jobName == "" {
@@ -65,15 +81,6 @@ func (pm PrometheusMetrics) Metrics(ctx *gin.Context) {
 	// pm.memoryTotalGauge.WithLabelValues("test", "machine1").Set(24564)
 	// pm.memoryUsedGauge.WithLabelValues("test", "machine1").Set(22128)
 	// pm.memoryUsedGauge.With(prometheus.Labels{"job": "test", "instance": "machine1"}).Set(22128)
-
-	contx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	di := db.MDB.GetAllLatestDeviceInfo(contx)
-	for _, info := range di {
-		pm.utilizationGPUGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.UtilizationGPU))
-		pm.memoryTotalGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.MemoryTotal))
-		pm.memoryUsedGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.MemoryUsed))
-	}
 
 	gatherers := prometheus.Gatherers{
 		pm.reg,
