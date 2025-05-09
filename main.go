@@ -42,7 +42,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := db.InitMongo(ctx, cfg.MongoURI, cfg.MongoDB); err != nil {
+	if err := db.InitMongo(ctx, cfg.MongoDB.URI, cfg.MongoDB.Database, cfg.MongoDB.ExpireTime); err != nil {
 		os.Exit(1)
 	}
 

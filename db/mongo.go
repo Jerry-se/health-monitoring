@@ -22,17 +22,42 @@ type mongoDB struct {
 	deviceInfoCollection   *mongo.Collection
 }
 
-func InitMongo(ctx context.Context, uri, db string) error {
+func InitMongo(ctx context.Context, uri, db string, eas int64) error {
 	opts := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		log.Log.Fatalf("Connect mongodb failed: %v", err)
+		return err
 	}
 	if err = client.Ping(ctx, nil); err != nil {
 		log.Log.Fatalf("Ping mongodb failed: %v", err)
+		return err
 	}
 	MDB = &mongoDB{
 		Mongo: client,
+	}
+
+	cl, err := client.Database(db).ListCollectionNames(ctx, bson.M{"name": "device_info", "type": "collection"})
+	if err != nil {
+		log.Log.Fatalf("List mongodb collection names failed: %v", err)
+		return err
+	}
+	if len(cl) == 0 {
+		// Create collection with time series for device info
+		tsOpts := options.TimeSeries()
+		tsOpts.SetTimeField("timestamp")
+		tsOpts.SetMetaField("device")
+		tsOpts.SetGranularity("minutes")
+		// tsOpts.SetBucketMaxSpan(30)
+		// tsOpts.SetBucketRounding(5)
+		ccOpts := options.CreateCollection()
+		ccOpts.SetTimeSeriesOptions(tsOpts)
+		ccOpts.SetExpireAfterSeconds(eas)
+		if err := client.Database(db).CreateCollection(ctx, "device_info", ccOpts); err != nil {
+			log.Log.Fatalf("Create time series collection failed: %v", err)
+			return err
+		}
+		log.Log.Info("Create collection with time series success")
 	}
 
 	MDB.deviceOnlineCollection = client.Database(db).Collection("device_online")
@@ -60,7 +85,7 @@ func (db *mongoDB) IsNodeOnline(ctx context.Context, nodeId string) bool {
 func (db *mongoDB) NodeOnline(ctx context.Context, nodeId string) error {
 	res, err := db.deviceOnlineCollection.InsertOne(ctx, types.MDBDeviceOnline{
 		DeviceId: nodeId,
-		AddTime:  time.Now().UnixMilli(),
+		AddTime:  time.Now(),
 	})
 	if err != nil {
 		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("insert online failed: ", err)
@@ -88,14 +113,20 @@ func (db *mongoDB) GetDeviceInfo(ctx context.Context, nodeId string) (*types.MDB
 	return result, nil
 }
 
-func (db *mongoDB) AddDeviceInfo(ctx context.Context, nodeId string, info types.WsMachineInfoRequest) error {
+func (db *mongoDB) AddDeviceInfo(ctx context.Context, nodeId string, tm time.Time, info types.WsMachineInfoRequest) error {
 	result, err := db.deviceInfoCollection.InsertOne(
 		ctx,
 		types.MDBDeviceInfo{
-			DeviceId:             nodeId,
-			WsMachineInfoRequest: info,
-			AddTime:              time.Now().UnixMilli(),
-			UpdateTime:           time.Now().UnixMilli(),
+			Timestamp: tm,
+			Device: types.MDBMetaField{
+				DeviceId: nodeId,
+				Project:  info.Project,
+				Models:   info.Models,
+				GPUName:  info.GPUName,
+			},
+			UtilizationGPU: info.UtilizationGPU,
+			MemoryTotal:    info.MemoryTotal,
+			MemoryUsed:     info.MemoryUsed,
 		},
 	)
 	if err != nil {
@@ -106,23 +137,17 @@ func (db *mongoDB) AddDeviceInfo(ctx context.Context, nodeId string, info types.
 	return nil
 }
 
-func (db *mongoDB) UpdateDeviceInfo(ctx context.Context, nodeId string, info types.WsMachineInfoRequest) error {
-	result, err := db.deviceInfoCollection.UpdateOne(
+func (db *mongoDB) DeleteExpiredDeviceInfo(ctx context.Context, tm time.Time) error {
+	result, err := db.deviceInfoCollection.DeleteMany(
 		ctx,
-		bson.M{"device_id": nodeId},
 		bson.M{
-			"$set": types.MDBDeviceInfo{
-				WsMachineInfoRequest: info,
-				UpdateTime:           time.Now().UnixMilli(),
-			},
+			"timestamp": bson.M{"$lt": tm},
 		},
-		options.Update().SetUpsert(true),
 	)
 	if err != nil {
-		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("update device info failed: ", err)
+		log.Log.Errorf("Delete expired documents before %v manully failed: %v", tm, err)
 		return err
 	}
-	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("update device info count ",
-		result.MatchedCount, result.ModifiedCount, result.UpsertedCount)
+	log.Log.Infof("Delete expired documents before %v manully DeletedCount %v", tm, result.DeletedCount)
 	return nil
 }

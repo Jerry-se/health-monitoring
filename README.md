@@ -1,5 +1,25 @@
 # Health Monitoring
 
+健康监控平台。
+
+## 设计方案
+
+1. 提供 HTTP/Websocket 服务，可以用 Websocket 是否连接作为是否在线的判断依据。
+2. 使用 MongoDB 数据库存储，支持水平扩展的集群服务。
+3. 提供一些接口可以为 Prometheus 提供数据。
+
+- [MongoDB 时间序列](https://www.mongodb.com/zh-cn/products/capabilities/time-series)
+- [MongoDB 时间序列用户文档](https://www.mongodb.com/zh-cn/docs/manual/core/timeseries-collections/)
+- [MongoDB Go Driver 时间序列集合](https://www.mongodb.com/zh-cn/docs/drivers/go/current/fundamentals/time-series/)
+- [Prometheus Pushgateway](https://github.com/prometheus/pushgateway)
+
+备注: MongoDB 5.0 版本太低，时间序列功能不全，还有 Bug，需要使用最新的 7.0 以上版本。
+
+```shell
+docker pull mongodb/mongodb-community-server:7.0.12-ubuntu2204
+docker run --name mongodb -p 27017:27017 -d mongodb/mongodb-community-server:7.0.12-ubuntu2204
+```
+
 ## Build
 
 ```shell
@@ -16,8 +36,11 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=v0.1.5"
   "Addr": "0.0.0.0:9521",
   "LogLevel": "info",
   "LogFile": "./test.log",
-  "MongoURI": "mongodb://127.0.0.1:27017/",
-  "MongoDB": "health_monitoring"
+  "MongoDB": {
+    "URI": "mongodb://127.0.0.1:27017/",
+    "Database": "health_monitoring",
+    "ExpireTime": 86400
+  }
 }
 ```
 
