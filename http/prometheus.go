@@ -82,10 +82,6 @@ func (pm PrometheusMetrics) Metrics(ctx *gin.Context) {
 	// pm.memoryUsedGauge.WithLabelValues("test", "machine1").Set(22128)
 	// pm.memoryUsedGauge.With(prometheus.Labels{"job": "test", "instance": "machine1"}).Set(22128)
 
-	gatherers := prometheus.Gatherers{
-		pm.reg,
-	}
-
-	h := promhttp.HandlerFor(gatherers, promhttp.HandlerOpts{})
+	h := promhttp.HandlerFor(pm.reg, promhttp.HandlerOpts{Registry: pm.reg})
 	h.ServeHTTP(w, r)
 }
