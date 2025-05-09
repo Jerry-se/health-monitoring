@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"health-monitoring/db"
+	"health-monitoring/http"
 	"health-monitoring/log"
 	"health-monitoring/types"
 	"health-monitoring/ws"
@@ -46,7 +47,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	pm := http.NewPrometheusMetrics()
+
 	router := gin.Default()
+	router.GET("/metrics/prometheus", pm.Metrics)
 	router.GET("/echo", ws.Echo)
 	router.GET("/websocket", ws.Ws)
 	log.Log.Fatal(router.Run(cfg.Addr))
