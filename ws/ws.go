@@ -45,7 +45,7 @@ func Ws(ctx *gin.Context) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "Upgrade to websocket failed", http.StatusUpgradeRequired)
-		log.Log.Error("Upgrade to websocket failed:", err)
+		log.Log.Error("Upgrade to websocket failed: ", err)
 		return
 	}
 	defer func() {
@@ -72,7 +72,7 @@ func Ws(ctx *gin.Context) {
 		if err != nil {
 			log.Log.WithFields(logrus.Fields{
 				"node_id": nodeId,
-			}).Info("read:", err)
+			}).Info("read: ", err)
 			break
 		}
 		log.Log.WithFields(logrus.Fields{
@@ -83,7 +83,7 @@ func Ws(ctx *gin.Context) {
 		if err := json.Unmarshal(message, req); err != nil {
 			log.Log.WithFields(logrus.Fields{
 				"node_id": nodeId,
-			}).Error("parse request failed", err)
+			}).Error("parse request failed: ", err)
 			writeWsResponse(c, nodeId, &types.WsResponse{
 				WsHeader: types.WsHeader{
 					Version:   0,
@@ -109,14 +109,14 @@ func writeWsResponse(c *websocket.Conn, nodeId string, res *types.WsResponse) er
 	if err != nil {
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
-		}).Error("marshal reponse failed", err)
+		}).Error("marshal reponse failed: ", err)
 		return err
 	}
 	err = c.WriteMessage(websocket.TextMessage, resBytes)
 	if err != nil {
 		log.Log.WithFields(logrus.Fields{
 			"node_id": nodeId,
-		}).Error("write response message failed", err)
+		}).Error("write response message failed: ", err)
 		return err
 	}
 	return nil

@@ -6,8 +6,8 @@ type MDBDeviceOnline struct {
 }
 
 type MDBDeviceInfo struct {
-	DeviceId string `json:"device_id" bson:"device_id"`
+	DeviceId string `json:"device_id" bson:"device_id,omitempty"`
 	WsMachineInfoRequest
-	AddTime    int64 `json:"add_time" bson:"add_time"`
-	UpdateTime int64 `json:"update_time" bson:"update_time"`
+	AddTime    int64 `json:"add_time" bson:"add_time,omitempty"`
+	UpdateTime int64 `json:"update_time" bson:"update_time,omitempty"`
 }

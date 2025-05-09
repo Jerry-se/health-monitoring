@@ -63,20 +63,20 @@ func (db *mongoDB) NodeOnline(ctx context.Context, nodeId string) error {
 		AddTime:  time.Now().UnixMilli(),
 	})
 	if err != nil {
-		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("insert online failed:", err)
+		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("insert online failed: ", err)
 		return err
 	}
-	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("inserted online id", res.InsertedID)
+	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("inserted online id ", res.InsertedID)
 	return nil
 }
 
 func (db *mongoDB) NodeOffline(ctx context.Context, nodeId string) error {
 	result, err := db.deviceOnlineCollection.DeleteOne(ctx, bson.M{"device_id": nodeId})
 	if err != nil {
-		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("delete online failed:", err)
+		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("delete online failed: ", err)
 		return err
 	}
-	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("delete online count", result.DeletedCount)
+	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("delete online count ", result.DeletedCount)
 	return nil
 }
 
@@ -99,10 +99,10 @@ func (db *mongoDB) AddDeviceInfo(ctx context.Context, nodeId string, info types.
 		},
 	)
 	if err != nil {
-		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("insert device info failed:", err)
+		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("insert device info failed: ", err)
 		return err
 	}
-	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("inserted device info id", result.InsertedID)
+	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("inserted device info id ", result.InsertedID)
 	return nil
 }
 
@@ -119,10 +119,10 @@ func (db *mongoDB) UpdateDeviceInfo(ctx context.Context, nodeId string, info typ
 		options.Update().SetUpsert(true),
 	)
 	if err != nil {
-		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("update device info failed:", err)
+		log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Error("update device info failed: ", err)
 		return err
 	}
-	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("update device info count",
+	log.Log.WithFields(logrus.Fields{"node_id": nodeId}).Info("update device info count ",
 		result.MatchedCount, result.ModifiedCount, result.UpsertedCount)
 	return nil
 }
