@@ -1,6 +1,12 @@
 package http
 
 import (
+	"context"
+	"net/http"
+	"time"
+
+	"health-monitoring/db"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -9,15 +15,17 @@ import (
 // https://pkg.go.dev/github.com/prometheus/client_golang@v1.20.2/prometheus
 
 type PrometheusMetrics struct {
+	jobName             string
 	reg                 *prometheus.Registry
 	utilizationGPUGauge *prometheus.GaugeVec
 	memoryTotalGauge    *prometheus.GaugeVec
 	memoryUsedGauge     *prometheus.GaugeVec
 }
 
-func NewPrometheusMetrics() *PrometheusMetrics {
+func NewPrometheusMetrics(jobName string) *PrometheusMetrics {
 	pm := &PrometheusMetrics{
-		reg: prometheus.NewRegistry(),
+		jobName: jobName,
+		reg:     prometheus.NewRegistry(),
 		utilizationGPUGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "utilization_gpu",
@@ -48,12 +56,25 @@ func NewPrometheusMetrics() *PrometheusMetrics {
 
 func (pm PrometheusMetrics) Metrics(ctx *gin.Context) {
 	w, r := ctx.Writer, ctx.Request
+	if pm.jobName == "" {
+		ctx.String(http.StatusInternalServerError, "job name is empty")
+		return
+	}
 
-	// pm.gauge.Set(30)
-	pm.utilizationGPUGauge.WithLabelValues("test", "machine1").Set(30)
-	pm.memoryTotalGauge.WithLabelValues("test", "machine1").Set(24564)
-	pm.memoryUsedGauge.WithLabelValues("test", "machine1").Set(22128)
+	// pm.utilizationGPUGauge.WithLabelValues("test", "machine1").Set(30)
+	// pm.memoryTotalGauge.WithLabelValues("test", "machine1").Set(24564)
+	// pm.memoryUsedGauge.WithLabelValues("test", "machine1").Set(22128)
 	// pm.memoryUsedGauge.With(prometheus.Labels{"job": "test", "instance": "machine1"}).Set(22128)
+
+	contx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	di := db.MDB.GetAllLatestDeviceInfo(contx)
+	for _, info := range di {
+		pm.utilizationGPUGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.UtilizationGPU))
+		pm.memoryTotalGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.MemoryTotal))
+		pm.memoryUsedGauge.WithLabelValues(pm.jobName, info.Device.DeviceId).Set(float64(info.MemoryUsed))
+	}
+
 	gatherers := prometheus.Gatherers{
 		pm.reg,
 	}

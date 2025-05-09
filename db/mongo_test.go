@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"log"
 	"strconv"
 	"testing"
 	"time"
@@ -12,12 +13,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// go test -v -timeout 30s -count=1 -run TestMongoDB health-monitoring/db
-func TestMongoDB(t *testing.T) {
+// go test -v -timeout 30s -count=1 -run TestMongoDBBasic health-monitoring/db
+func TestMongoDBBasic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	var uri = "mongodb://localhost:27017"
+	// var uri = "mongodb://localhost:37017"
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI))
 	if err != nil {
@@ -83,6 +85,32 @@ func TestMongoDB(t *testing.T) {
 		}
 	}
 	t.Logf("Find collection item: %v", result)
+
+	pipeline := mongo.Pipeline{
+		{{"$sort", bson.D{{"score", -1}}}},
+		{{"$limit", 1}},
+	}
+	cur, err = collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Fatalf("Aggregate failed: %v", err)
+	}
+	for cur.Next(ctx) {
+		result := struct {
+			Name       string
+			Score      int
+			AddTime    time.Time `json:"add_time" bson:"add_time"`
+			UpdateTime time.Time `json:"update_time" bson:"update_time"`
+		}{}
+		if err := cur.Decode(&result); err != nil {
+			t.Fatalf("decode cursor into struct failed: %v", err)
+		}
+		t.Logf("cursor %v -> %v", result, cur.Current.String())
+	}
+	if err := cur.Err(); err != nil {
+		t.Fatalf("cursor error: %v", err)
+	}
+	cur.Close(ctx)
+	t.Log("Aggregate end")
 
 	deleteRes, err := collection.DeleteOne(ctx, bson.M{"name": "6"})
 	if err != nil {
@@ -163,6 +191,7 @@ func TestMongoDBTimeSeries(t *testing.T) {
 	defer cancel()
 
 	var uri = "mongodb://localhost:27017"
+	// var uri = "mongodb://localhost:37017"
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetServerAPIOptions(serverAPI))
 	if err != nil {
@@ -176,7 +205,7 @@ func TestMongoDBTimeSeries(t *testing.T) {
 	}()
 
 	searchCollection := func(ctx context.Context, client *mongo.Client) {
-		cl, err := client.Database("test").ListCollectionNames(ctx, bson.M{"name": "testinfo", "type": "collection"})
+		cl, err := client.Database("test").ListCollectionNames(ctx, bson.M{"name": "testinfo"})
 		t.Logf("ListCollectionNames testinfo return %v %v", cl, err)
 	}
 	searchCollection(ctx, client)
@@ -263,9 +292,42 @@ func TestMongoDBTimeSeries(t *testing.T) {
 	}
 	t.Logf("Find collection item: %v", result)
 
+	pipeline := mongo.Pipeline{
+		{{"$sort", bson.D{{"device.id", 1}, {"timestamp", -1}}}},
+		{{"$group", bson.D{
+			{"_id", "$device.id"},
+			{"latestRecord", bson.D{{"$first", "$$ROOT"}}},
+		}}},
+		{{"$replaceRoot", bson.D{{"newRoot", "$latestRecord"}}}},
+	}
+	cur, err := collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Fatalf("Aggregate failed: %v", err)
+	}
+	for cur.Next(ctx) {
+		result := struct {
+			Timestamp time.Time
+			Device    struct {
+				Id      string
+				Project string
+			}
+			Temperature int
+			Utilization int
+		}{}
+		if err := cur.Decode(&result); err != nil {
+			t.Fatalf("decode cursor into struct failed: %v", err)
+		}
+		t.Logf("cursor %v -> %v", result, cur.Current.String())
+	}
+	if err := cur.Err(); err != nil {
+		t.Fatalf("cursor error: %v", err)
+	}
+	cur.Close(ctx)
+	t.Log("Aggregate end")
+
 	time.Sleep(2 * time.Second)
 
-	cur, err := collection.Find(ctx, bson.D{})
+	cur, err = collection.Find(ctx, bson.D{})
 	if err != nil {
 		t.Fatalf("Get iterater cursor failed: %v", err)
 	}

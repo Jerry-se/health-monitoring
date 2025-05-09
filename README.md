@@ -41,6 +41,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=v0.1.5"
     "URI": "mongodb://127.0.0.1:27017/",
     "Database": "health_monitoring",
     "ExpireTime": 86400
+  },
+  "Prometheus": {
+    "JobName": "test"
   }
 }
 ```
